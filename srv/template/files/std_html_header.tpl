@@ -16,19 +16,13 @@
 		<script type="text/javascript" src="/assets/js/bootstrap.min.js"></script>
 		<script type="text/javascript" src="/assets/js/sitemgr.js"></script>
 		<title>
-			{{with .HtmlTitle}}
-				{{.}} | SiteMgr
-			{{else}}
-				SiteMgr
-			{{end}}
+			SiteMgr
 		</title>	
 	</head>
 	<body>
 		{{template "navigation" .}}		
 		<div class="container" id="main">
-		{{with .FlashMessage}}
-			<h2 class="flashmessage">{{.}}</h2>
-		{{end}}
+	
 		<noscript>
 			<h1 id="nojs" class="alert alert-danger">
 				<span class="glyphicon glyphicon-warning-sign"></span>

@@ -3,16 +3,20 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	html "html/template"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/GeertJohan/go.rice"
+	"github.com/GeorgeMac/idicon/icon"
 	"github.com/labstack/echo"
 	"go.iondynamics.net/iDechoLog"
 	idl "go.iondynamics.net/iDlogger"
 	kv "go.iondynamics.net/kvStore"
 	"go.iondynamics.net/kvStore/backend/bolt"
+	"go.iondynamics.net/templice"
 
 	"go.iondynamics.net/siteMgr"
 	reg "go.iondynamics.net/siteMgr/srv/registry"
@@ -24,6 +28,15 @@ var (
 	debug          = flag.Bool("debug", false, "Enable debug output")
 	httpListener   = flag.String("http", ":9211", "Bind HTTP-Listener to ...")
 	clientListener = flag.String("client", ":9210", "Bind Client-Listener to ...")
+
+	mu       sync.RWMutex
+	iconHash map[string]string = make(map[string]string)
+
+	key = []byte{0x42, 0x89, 0x10, 0x01, 0x07, 0xAC, 0xDC, 0x77, 0x70, 0x07, 0x66, 0x6B, 0xCD, 0xFF, 0x13, 0xCC}
+)
+
+const (
+	version = "0.1.0"
 )
 
 func main() {
@@ -38,16 +51,29 @@ func main() {
 	}
 	kv.Init(pp)
 
-	tpl, err := template.New()
+	tpl := template.NewTpl()
+	tpl.SetPrep(func(f html.FuncMap) templice.Func {
+		return func(templ *html.Template) *html.Template {
+			return templ.Funcs(f)
+		}
+	}(html.FuncMap{
+		"identicon": func(user string) html.HTML {
+			mu.RLock()
+			defer mu.RUnlock()
+			return html.HTML(iconHash[user])
+		},
+	}))
+
 	if *debug {
-		tpl, err = template.Dev()
+		tpl.Dev()
 	}
+	r, err := template.Renderer(tpl)
 	if err != nil {
 		idl.Emerg(err)
 	}
 
 	e := echo.New()
-	e.SetRenderer(tpl)
+	e.SetRenderer(r)
 	if false {
 		e.Use(iDechoLog.New())
 	}
@@ -59,6 +85,7 @@ func main() {
 	})
 
 	route.Init(e)
+	e.HTTP2(true)
 
 	idl.Info("HTTP on", *httpListener)
 	go e.Run(*httpListener)
@@ -86,6 +113,8 @@ func handleConnection(c net.Conn) {
 	msg := &siteMgr.Message{}
 	usr := siteMgr.NewUser()
 
+	var hash string
+
 	var authed bool
 	for !authed && dec.More() {
 		if err := dec.Decode(msg); err != nil {
@@ -98,6 +127,11 @@ func handleConnection(c net.Conn) {
 			return
 		}
 
+		if sitemgr.AtLeast("0.1.0", msg) {
+			hash = usr.Sites["identicon-hash"].Name
+		}
+
+		msg.Version = version
 		msg.Body = []byte{}
 		if usr.Login() == nil {
 			idl.Debug("Login success")
@@ -136,6 +170,23 @@ func handleConnection(c net.Conn) {
 		closed <- true
 	}()
 
+	if hash != "" {
+		props := icon.DefaultProps()
+		props.Size = 21
+		props.Padding = 0
+		props.BorderRadius = 7
+		generator, err := icon.NewGenerator(5, 5, icon.With(props))
+		if err != nil {
+			idl.Err(err)
+			return
+		}
+		icn := generator.Generate([]byte(hash))
+
+		mu.Lock()
+		iconHash[usr.Name] = icn.String()
+		mu.Unlock()
+	}
+
 	ch := make(chan siteMgr.Site, 1)
 	idl.Debug("registering channel ", usr.Name, ch)
 	reg.Set(usr.Name, ch)
@@ -160,6 +211,7 @@ loop:
 		case <-closed:
 			break loop
 		}
+		msg.Version = version
 		idl.Debug("Sending message", msg)
 		err = enc.Encode(msg)
 		if err != nil {

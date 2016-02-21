@@ -12,7 +12,12 @@
 				</div>
 				<div id="navbar" class="collapse navbar-collapse">
 					<ul class="nav navbar-nav navbar-right">
-						<li class="pull-right"><a href="/v1/logout"><span class="glyphicon glyphicon-log-out"></span> Abmelden</a></li>
+					{{with .}}
+						<li class="pull-right"><a href="/logout"><span class="glyphicon glyphicon-log-out"></span> Log out</a></li>
+						<li class="pull-right"><a href="/backup/mgr"><span class="glyphicon glyphicon-hdd"></span> Backup</a></li>
+					{{else}}
+						<li class="pull-right"><a href="/register"><span class="glyphicon glyphicon-log-in"></span> Register</a></li>
+					{{end}}
 					</ul>
 				</div><!--/.nav-collapse -->
 			</div>

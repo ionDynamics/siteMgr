@@ -12,14 +12,18 @@ func New() (*templiceEchoRenderer.Renderer, error) {
 	return templiceEchoRenderer.New(tpl), err
 }
 
-func NewTpl() (*templice.Template, error) {
+func NewTpl() *templice.Template {
 	tpl := templice.New(rice.MustFindBox("files"))
-	err := tpl.Load()
-	return tpl, err
+	return tpl
 }
 
 func Dev() (*templiceEchoRenderer.Renderer, error) {
 	tpl := templice.New(rice.MustFindBox("files"))
 	err := tpl.Dev().Load()
+	return templiceEchoRenderer.New(tpl), err
+}
+
+func Renderer(tpl *templice.Template) (*templiceEchoRenderer.Renderer, error) {
+	err := tpl.Load()
 	return templiceEchoRenderer.New(tpl), err
 }

@@ -3,14 +3,17 @@ package siteMgr //import "go.iondynamics.net/siteMgr"
 import (
 	"fmt"
 	"sync"
+
+	semver "github.com/hashicorp/go-version"
+	idl "go.iondynamics.net/iDlogger"
 )
 
 type User struct {
 	Name     string
 	Password string
 	//Fullname string
-	Sites map[string]Site
 	m     sync.RWMutex
+	Sites map[string]Site
 }
 
 type Site struct {
@@ -23,15 +26,15 @@ type Site struct {
 }
 
 type Message struct {
-	Type string
-	Body []byte
+	Type    string
+	Body    []byte
+	Version string
 }
 
 func NewUser() *User {
 	return &User{
 		Sites: make(map[string]Site),
 	}
-
 }
 
 func (u *User) Update() error {
@@ -86,10 +89,38 @@ func (u *User) GetSite(s string) Site {
 	return u.Sites[s]
 }
 
+func (u *User) GetSites() []Site {
+	u.m.RLock()
+	defer u.m.RUnlock()
+
+	sites := []Site{}
+	for _, site := range u.Sites {
+		sites = append(sites, site)
+	}
+
+	return sites
+}
+
 func (u *User) DelSite(s string) error {
 	u.m.Lock()
 	defer u.m.Unlock()
 
 	delete(u.Sites, s)
 	return u.Upsert()
+}
+
+func AtLeast(str string, msg *Message) bool {
+	constraint, err := semver.NewConstraint(">= " + str)
+	if err != nil {
+		idl.Err(err)
+		return false
+	}
+
+	v, err := semver.NewVersion(msg.Version)
+	if err != nil {
+		idl.Debug(err)
+		return false
+	}
+
+	return constraint.Check(v)
 }

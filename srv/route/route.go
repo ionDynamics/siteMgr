@@ -1,6 +1,7 @@
 package route //import "go.iondynamics.net/siteMgr/srv/route"
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -66,10 +67,10 @@ func Init(e *echo.Echo) {
 		}
 
 		if registry.Get(usr.Name) == nil {
-			return c.Render(http.StatusOK, "clientGet.tpl", nil)
+			return c.Render(http.StatusOK, "clientGet.tpl", usr)
 		}
 
-		return c.Render(http.StatusOK, "siteListGet.tpl", usr.Sites)
+		return c.Render(http.StatusOK, "siteListGet.tpl", usr)
 	})
 
 	e.Post("/site/send", func(c *echo.Context) error {
@@ -121,6 +122,62 @@ func Init(e *echo.Echo) {
 		}
 
 		return c.Redirect(http.StatusFound, "/site/list")
+	})
+
+	e.Get("/backup/mgr", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusTemporaryRedirect, "/login")
+		}
+
+		return c.Render(http.StatusOK, "backupMgrGet.tpl", usr)
+	})
+
+	e.Get("/backup/get", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusTemporaryRedirect, "/login")
+		}
+		c.Response().Header().Set("Content-Disposition", "attachment; filename=\""+usr.Name+"_"+time.Now().Format("06_01_02_15_04")+".json\"")
+		c.Response().Header().Set("Content-type", "application/json")
+		enc := json.NewEncoder(c.Response())
+		err := enc.Encode(usr.GetSites())
+		if err != nil {
+			return err
+		}
+		c.Response().Flush()
+
+		return nil
+	})
+
+	e.Post("/backup/recover", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+
+		file, _, err := c.Request().FormFile("recover-json")
+		if err != nil {
+			return err
+		}
+
+		sites := []siteMgr.Site{}
+		dec := json.NewDecoder(file)
+		err = dec.Decode(&sites)
+		if err != nil {
+			return err
+		}
+
+		idl.Debug(sites)
+
+		for _, site := range sites {
+			err = usr.SetSite(site)
+			if err != nil {
+				return err
+			}
+		}
+
+		return c.Redirect(http.StatusFound, "/backup/mgr")
 	})
 
 	e.Get("/logout", func(c *echo.Context) error {

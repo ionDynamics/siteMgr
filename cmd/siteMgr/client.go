@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha512"
 	"encoding/json"
 	"flag"
 	"net"
 	"os"
 	"os/signal"
 
+	"github.com/sanbornm/go-selfupdate/selfupdate"
 	idl "go.iondynamics.net/iDlogger"
 	"go.iondynamics.net/statelessPassword"
 
@@ -25,9 +27,26 @@ var (
 	server     = flag.String("server", "sitemgr.ion.onl:9210", "siteMgr-server host:port")
 )
 
+const (
+	version = "0.1.0"
+)
+
 func main() {
 	flag.Parse()
 	*idl.StandardLogger() = *idl.WithDebug(*debug)
+
+	var updater = &selfupdate.Updater{
+		CurrentVersion: version,
+		ApiURL:         "https://update.slpw.de/",
+		BinURL:         "https://update.slpw.de/",
+		DiffURL:        "https://update.slpw.de/",
+		Dir:            "siteMgr/",
+		CmdName:        "siteMgr", // app name
+	}
+
+	if updater != nil {
+		go updater.BackgroundRun()
+	}
 
 	s := bufio.NewScanner(os.Stdin)
 	fullname := getFullname(s)
@@ -68,8 +87,18 @@ func main() {
 	for msg.Type != "LOGIN:SUCCESS" {
 		usr.Name = getLoginName(s)
 		usr.Password = getLoginPassword(s)
-		say("debug")
 
+		hash := sha512.New()
+		for i := 0; i < 10000; i++ {
+			hash.Write([]byte(fullname))
+			hash.Write(bytMasterPw)
+			hash.Write([]byte(usr.Name))
+			hash.Write([]byte(usr.Password))
+			hash.Write(hash.Sum(nil))
+		}
+		usr.Sites["identicon-hash"] = siteMgr.Site{Name: string(hash.Sum(nil))}
+
+		msg.Version = version
 		msg.Type = "siteMgr.User"
 		msg.Body, err = json.Marshal(usr)
 		if err != nil {
@@ -78,7 +107,7 @@ func main() {
 		}
 		idl.Debug(string(msg.Body))
 
-		say("Sending credentials")
+		idl.Debug("Sending credentials")
 		err = enc.Encode(msg)
 		if err != nil {
 			idl.Err("encoder error:", err)
@@ -101,8 +130,9 @@ func main() {
 		for {
 			<-c
 			gomsg := &siteMgr.Message{}
+			gomsg.Version = version
 			gomsg.Type = "LOGOUT"
-			idl.Debug(enc.Encode(msg))
+			idl.Debug(enc.Encode(gomsg))
 			conn.Close()
 			os.Exit(0)
 		}

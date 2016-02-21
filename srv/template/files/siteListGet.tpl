@@ -1,12 +1,22 @@
 {{template "header" .}}
-
-<ol class="breadcrumb">
-  <li class="active">My Sites</li>
-</ol>
-
+{{with .Name}}
+	{{$idicn := . | identicon }}
+		{{if ne "" $idicn}}
+			<div class="row">
+				<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
+					Currently logged in as <b>{{.}}</b><br>
+					Your Masterpassword generated this image:<br>
+					If it looks different than usual you misspelled it maybe
+				</div>
+				<div class="col-xs-12 col-sm-6">
+					{{$idicn}}
+				</div>
+			</div>
+		{{end}}				
+{{end}}
 <div class="row">
 	<div class="col-xs-12">
-
+	
 		<h2>My Sites</h2>
 
 		<table class="table table-bordered table-hover table-striped">
@@ -18,7 +28,7 @@
 				<th>Email</th>
 				<th>&nbsp;</th>
 			</tr>
-			{{range .}}
+			{{range .Sites}}
 			<tr>
 				<td>
 					{{.Name}}
