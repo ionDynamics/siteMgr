@@ -1,22 +1,42 @@
 {{template "header" .}}
 {{with .Name}}
-	{{$idicn := . | identicon }}
-		{{if ne "" $idicn}}
-			<div class="row">
-				<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
+	{{$cinf := . | clientInfo}}
+		<div class="row">
+			<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
+				<p>
 					Currently logged in as <b>{{.}}</b><br>
 					Your Masterpassword generated this image:<br>
 					If it looks different than usual you misspelled it maybe
-				</div>
-				<div class="col-xs-12 col-sm-6">
-					{{$idicn}}
-				</div>
+				</p>
 			</div>
-		{{end}}				
+			<div class="col-xs-12 col-sm-2">
+				{{$cinf.Identicon}}
+			</div>
+			<div class="col-xs-12 col-sm-4">
+				<p class="small text-muted">
+					<b>Client Info</b><br>
+					Message Version: {{$cinf.MsgVersion}}<br>
+					<table class="clientInfo">
+						<tr>
+							<td>Vendor:&nbsp;</td><td>{{$cinf.Vendor}}</td>
+						</tr>
+						<tr>
+							<td>Client:&nbsp;</td><td>{{$cinf.Client}}</td>
+						</tr>
+						<tr>
+							<td>Variant:&nbsp;</td><td>{{$cinf.Variant}}</td>
+						</tr>
+						<tr>
+							<td>Address:&nbsp;</td><td>{{$cinf.Address}}</td>
+						</tr>
+					</table>
+				</p>
+			</div>
+		</div>				
 {{end}}
 <div class="row">
 	<div class="col-xs-12">
-	
+
 		<h2>My Sites</h2>
 
 		<table class="table table-bordered table-hover table-striped">

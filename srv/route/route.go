@@ -3,6 +3,7 @@ package route //import "go.iondynamics.net/siteMgr/srv/route"
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"go.iondynamics.net/siteMgr/srv/session"
 )
 
-func Init(e *echo.Echo) {
+func Init(e *echo.Echo, fn func(string) string) {
 	e.Get("/", func(c *echo.Context) error {
 		return c.Redirect(http.StatusFound, "/site/list")
 	})
@@ -70,6 +71,11 @@ func Init(e *echo.Echo) {
 			return c.Render(http.StatusOK, "clientGet.tpl", usr)
 		}
 
+		host, _, _ := net.SplitHostPort(c.Request().RemoteAddr)
+		if fn(usr.Name) != host {
+			return c.Render(http.StatusOK, "clientGet.tpl", usr)
+		}
+
 		return c.Render(http.StatusOK, "siteListGet.tpl", usr)
 	})
 
@@ -80,6 +86,10 @@ func Init(e *echo.Echo) {
 		}
 		ch := registry.Get(usr.Name)
 		if ch != nil {
+			host, _, _ := net.SplitHostPort(c.Request().RemoteAddr)
+			if fn(usr.Name) != host {
+				return c.Redirect(http.StatusFound, "/site/list")
+			}
 			idl.Debug(ch)
 			site := usr.GetSite(c.Form("site-name"))
 			idl.Debug(site)

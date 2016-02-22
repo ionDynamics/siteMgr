@@ -25,27 +25,30 @@ var (
 	noTerminal = flag.Bool("no-terminal", false, "Set this to true if your standard input isn't a terminal")
 	debug      = flag.Bool("debug", false, "Enable debug logging")
 	server     = flag.String("server", "sitemgr.ion.onl:9210", "siteMgr-server host:port")
-)
+	autoupdate = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 
-const (
-	version = "0.1.0"
+	VERSION = "0.2.0"
 )
 
 func main() {
 	flag.Parse()
 	*idl.StandardLogger() = *idl.WithDebug(*debug)
 
-	var updater = &selfupdate.Updater{
-		CurrentVersion: version,
-		ApiURL:         "https://update.slpw.de/",
-		BinURL:         "https://update.slpw.de/",
-		DiffURL:        "https://update.slpw.de/",
-		Dir:            "siteMgr/",
-		CmdName:        "siteMgr", // app name
-	}
+	idl.Debug(VERSION)
 
-	if updater != nil {
-		go updater.BackgroundRun()
+	if *autoupdate {
+		var updater = &selfupdate.Updater{
+			CurrentVersion: VERSION,
+			ApiURL:         "https://update.slpw.de/",
+			BinURL:         "https://update.slpw.de/",
+			DiffURL:        "https://update.slpw.de/",
+			Dir:            "siteMgr/",
+			CmdName:        "siteMgr", // app name
+		}
+
+		if updater != nil {
+			go updater.BackgroundRun()
+		}
 	}
 
 	s := bufio.NewScanner(os.Stdin)
@@ -97,8 +100,9 @@ func main() {
 			hash.Write(hash.Sum(nil))
 		}
 		usr.Sites["identicon-hash"] = siteMgr.Site{Name: string(hash.Sum(nil))}
+		usr.Sites["client"] = siteMgr.Site{Name: "ionDynamics", Login: "siteMgr", Version: "CLI"}
 
-		msg.Version = version
+		msg.Version = VERSION
 		msg.Type = "siteMgr.User"
 		msg.Body, err = json.Marshal(usr)
 		if err != nil {
@@ -130,7 +134,7 @@ func main() {
 		for {
 			<-c
 			gomsg := &siteMgr.Message{}
-			gomsg.Version = version
+			gomsg.Version = VERSION
 			gomsg.Type = "LOGOUT"
 			idl.Debug(enc.Encode(gomsg))
 			conn.Close()
