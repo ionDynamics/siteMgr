@@ -3,7 +3,6 @@ package route //import "go.iondynamics.net/siteMgr/srv/route"
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	idl "go.iondynamics.net/iDlogger"
 
 	"go.iondynamics.net/siteMgr"
+	"go.iondynamics.net/siteMgr/encoder"
 	"go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/session"
 )
@@ -71,11 +71,6 @@ func Init(e *echo.Echo, fn func(string) string) {
 			return c.Render(http.StatusOK, "clientGet.tpl", usr)
 		}
 
-		host, _, _ := net.SplitHostPort(c.Request().RemoteAddr)
-		if fn(usr.Name) != host {
-			return c.Render(http.StatusOK, "clientGet.tpl", usr)
-		}
-
 		return c.Render(http.StatusOK, "siteListGet.tpl", usr)
 	})
 
@@ -86,16 +81,16 @@ func Init(e *echo.Echo, fn func(string) string) {
 		}
 		ch := registry.Get(usr.Name)
 		if ch != nil {
-			host, _, _ := net.SplitHostPort(c.Request().RemoteAddr)
-			if fn(usr.Name) != host {
-				return c.Redirect(http.StatusFound, "/site/list")
-			}
 			idl.Debug(ch)
 			site := usr.GetSite(c.Form("site-name"))
 			idl.Debug(site)
 
 			idl.Debug("sending site to client: ", usr.Name)
-			ch <- site
+			msg, err := encoder.Do(site)
+			if err != nil {
+				return err
+			}
+			ch <- msg
 		} else {
 			idl.Debug("nil channel")
 		}

@@ -6,13 +6,15 @@ import (
 	html "html/template"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/GeertJohan/go.rice"
 	"github.com/GeorgeMac/idicon/icon"
 	"github.com/labstack/echo"
-	"github.com/sanbornm/go-selfupdate/selfupdate"
+	"go.iondynamics.net/go-selfupdate"
 	"go.iondynamics.net/iDechoLog"
 	idl "go.iondynamics.net/iDlogger"
 	kv "go.iondynamics.net/kvStore"
@@ -20,6 +22,8 @@ import (
 	"go.iondynamics.net/templice"
 
 	"go.iondynamics.net/siteMgr"
+	"go.iondynamics.net/siteMgr/encoder"
+	"go.iondynamics.net/siteMgr/msgType"
 	reg "go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/route"
 	"go.iondynamics.net/siteMgr/srv/template"
@@ -32,155 +36,84 @@ var (
 	autoupdate     = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 
 	mu  sync.RWMutex
-	uim map[string]clientInfo = make(map[string]clientInfo)
+	cim map[string]clientInfo = make(map[string]clientInfo)
 
 	key = []byte{0x42, 0x89, 0x10, 0x01, 0x07, 0xAC, 0xDC, 0x77, 0x70, 0x07, 0x66, 0x6B, 0xCD, 0xFF, 0x13, 0xCC}
 
-	VERSION = "0.2.0"
+	VERSION = "0.4.0"
+
+	updater = &selfupdate.Updater{
+		CurrentVersion: VERSION,
+		ApiURL:         "https://update.slpw.de/",
+		BinURL:         "https://update.slpw.de/",
+		DiffURL:        "https://update.slpw.de/",
+		Dir:            "siteMgr-server/",
+		CmdName:        "siteMgr-server", // app name
+	}
+
+	lcs string
 )
 
 func main() {
 	flag.Parse()
 	*idl.StandardLogger() = *idl.WithDebug(*debug)
 
+	VERSION = strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(VERSION), "'"), "'")
 	idl.Info("Version: ", VERSION)
 	idl.Info("Starting...")
 
+	encoder.Init(VERSION)
 	update()
-
 	setupPersistence()
-
 	setupHttp()
-
 	runClientListener()
-}
-
-func handleConnection(c net.Conn) {
-	defer c.Close()
-
-	enc := json.NewEncoder(c)
-	dec := json.NewDecoder(c)
-	msg := &siteMgr.Message{}
-	usr := siteMgr.NewUser()
-
-	var hash string
-
-	var authed bool
-	for !authed && dec.More() {
-		if err := dec.Decode(msg); err != nil {
-			idl.Err("decoding message:", err)
-		}
-		err := json.Unmarshal(msg.Body, usr)
-		if err != nil {
-			idl.Err("unmarshal body:", err)
-			idl.Debug("ouch:", string(msg.Body))
-			return
-		}
-
-		if siteMgr.AtLeast("0.1.0", msg) {
-			hash = usr.Sites["identicon-hash"].Name
-			setClientMsgVersion(usr.Name, msg.Version)
-		}
-		if siteMgr.AtLeast("0.2.0", msg) {
-			cl := usr.Sites["client"]
-
-			host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
-			setClientInfo(usr.Name, cl.Name, cl.Login, cl.Version, host)
-		}
-
-		msg.Version = VERSION
-		msg.Body = []byte{}
-		if usr.Login() == nil {
-			idl.Debug("Login success")
-			authed = true
-			msg.Type = "LOGIN:SUCCESS"
-		} else {
-			msg.Type = "LOGIN:ERROR"
-		}
-
-		idl.Debug("Sending message", msg)
-		err = enc.Encode(msg)
-		if err != nil {
-			idl.Err(err)
-		}
-	}
-
-	if !authed {
-		return
-	}
-
-	idl.Debug("User Client logged in: ", usr.Name)
-
-	closed := make(chan bool)
-	go func() {
-		gomsg := &siteMgr.Message{}
-		for dec.More() {
-			err := dec.Decode(gomsg)
-			if err != nil {
-				continue
-			}
-			if gomsg.Type == "LOGOUT" {
-				idl.Debug("client logout: ", usr.Name)
-				break
-			}
-		}
-		closed <- true
-	}()
-
-	setIdenticon(usr.Name, hash)
-
-	ch := make(chan siteMgr.Site, 1)
-	idl.Debug("registering channel ", usr.Name, ch)
-	reg.Set(usr.Name, ch)
-
-loop:
-	for {
-		idl.Debug("ready for sending messages")
-		var err error
-		select {
-		case s := <-ch:
-			idl.Debug("channel sent site")
-
-			msg.Type = "siteMgr.Site"
-			msg.Body, err = json.Marshal(s)
-			if err != nil {
-				idl.Err(err)
-				continue
-			}
-		case <-time.After(3 * time.Minute):
-			msg.Type = "HEARTBEAT"
-			msg.Body = []byte{}
-		case <-closed:
-			break loop
-		}
-		msg.Version = VERSION
-		idl.Debug("Sending message", msg)
-		err = enc.Encode(msg)
-		if err != nil {
-			idl.Warn(err)
-			break
-		}
-	}
-
-	reg.Del(usr.Name)
-	idl.Debug("connection handler shutdown")
 }
 
 func update() {
 	if *autoupdate {
-		var updater = &selfupdate.Updater{
-			CurrentVersion: VERSION,
-			ApiURL:         "https://update.slpw.de/",
-			BinURL:         "https://update.slpw.de/",
-			DiffURL:        "https://update.slpw.de/",
-			Dir:            "siteMgr-server/",
-			CmdName:        "siteMgr-server", // app name
-		}
+		go func() {
+			for {
+				lcs = latestClientVersion()
 
-		if updater != nil {
-			go updater.BackgroundRun()
-		}
+				reload, _ := updater.Update()
+				idl.Debug("reload ", reload)
+				if reload {
+					msg, err := encoder.Do("Server is restarting")
+					if err == nil {
+						broadcast(msg)
+					} else {
+						idl.Err(err)
+					}
+					<-time.After(10 * time.Second)
+					os.Exit(1)
+				}
+				<-time.After(12 * time.Hour)
+			}
+		}()
 	}
+}
+
+func latestClientVersion() string {
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	resp, err := client.Get("https://update.slpw.de/siteMgr-server/windows-amd64.json")
+	if err != nil {
+		idl.Err("latestClientVersion", err)
+	}
+
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	m := make(map[string]string)
+	err = dec.Decode(m)
+	if err != nil {
+		idl.Err("latestClientVersion", err)
+	}
+	vers, ok := m["Version"]
+	if !ok {
+		idl.Err("latestClientVersion", "no version")
+	}
+	return vers
 }
 
 func setupPersistence() {
@@ -261,9 +194,9 @@ func setIdenticon(name, hash string) {
 		icn := generator.Generate([]byte(hash))
 
 		mu.Lock()
-		inf := uim[name]
+		inf := cim[name]
 		inf.Identicon = html.HTML(icn.String())
-		uim[name] = inf
+		cim[name] = inf
 		mu.Unlock()
 	}
 }
@@ -272,27 +205,34 @@ func setClientMsgVersion(name, ver string) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	inf := uim[name]
+	inf := cim[name]
 	inf.MsgVersion = ver
-	uim[name] = inf
+	cim[name] = inf
 }
 
 func setClientInfo(name, vendor, client, variant, address string) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	inf := uim[name]
+	inf := cim[name]
 	inf.Vendor = vendor
 	inf.Client = client
 	inf.Variant = variant
 	inf.Address = address
-	uim[name] = inf
+	cim[name] = inf
 }
 
 func getClientInfo(user string) clientInfo {
 	mu.RLock()
 	defer mu.RUnlock()
-	return uim[user]
+	return cim[user]
+}
+
+func delClientInfo(user string) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	delete(cim, user)
 }
 
 func getClientAddress(user string) string {
@@ -306,4 +246,125 @@ type clientInfo struct {
 	Client     string
 	Variant    string
 	Address    string
+}
+
+func handleConnection(c net.Conn) {
+	defer c.Close()
+
+	enc := json.NewEncoder(c)
+	dec := json.NewDecoder(c)
+	msg := &siteMgr.Message{}
+	usr := siteMgr.NewUser()
+
+	var hash string
+
+	var authed bool
+	for !authed && dec.More() {
+		if err := dec.Decode(msg); err != nil {
+			idl.Err("decoding message:", err)
+		}
+		err := json.Unmarshal(msg.Body, usr)
+		if err != nil {
+			idl.Err("unmarshal body:", err)
+			idl.Debug("ouch:", string(msg.Body))
+			return
+		}
+
+		if siteMgr.AtLeast("0.1.0", msg) {
+			hash = usr.Sites["identicon-hash"].Name
+			setClientMsgVersion(usr.Name, msg.Version)
+		}
+		if siteMgr.AtLeast("0.2.0", msg) {
+			cl := usr.Sites["client"]
+
+			host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
+			setClientInfo(usr.Name, cl.Name, cl.Login, cl.Version, host)
+		}
+
+		msg.Version = VERSION
+		msg.Body = []byte{}
+		if usr.Login() == nil {
+			idl.Debug("Login success")
+			authed = true
+			msg.Type = msgType.LOGIN_SUCCESS
+		} else {
+			msg.Type = msgType.LOGIN_ERROR
+		}
+
+		idl.Debug("Sending message", msg)
+		err = enc.Encode(msg)
+		if err != nil {
+			idl.Err(err)
+		}
+	}
+
+	if !authed {
+		return
+	}
+
+	idl.Debug("User Client logged in: ", usr.Name)
+
+	closed := make(chan bool)
+	go func() {
+		gomsg := &siteMgr.Message{}
+		for dec.More() {
+			err := dec.Decode(gomsg)
+			if err != nil {
+				continue
+			}
+			if gomsg.Type == msgType.LOGOUT {
+				idl.Debug("client logout: ", usr.Name)
+				break
+			}
+		}
+		closed <- true
+	}()
+
+	setIdenticon(usr.Name, hash)
+
+	ch := make(chan siteMgr.Message, 1)
+	idl.Debug("registering channel ", usr.Name, ch)
+	reg.Set(usr.Name, ch)
+
+loop:
+	for {
+		idl.Debug("ready for sending messages")
+		var err error
+		var send siteMgr.Message
+		select {
+		case send = <-ch:
+			idl.Debug("channel sent msg")
+		case <-time.After(3 * time.Minute):
+			send, err = encoder.Do(msgType.HEARTBEAT)
+			if err != nil {
+				idl.Err(err)
+				continue loop
+			}
+		case <-closed:
+			break loop
+		}
+		idl.Debug("Sending message", send)
+		err = enc.Encode(send)
+		if err != nil {
+			idl.Warn(err)
+			break
+		}
+	}
+
+	delClientInfo(usr.Name)
+	reg.Del(usr.Name)
+	idl.Debug("connection handler shutdown")
+}
+
+func broadcast(msg siteMgr.Message) {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	for name, _ := range cim {
+		ch := reg.Get(name)
+		if ch == nil {
+			continue
+		}
+		ch <- msg
+	}
 }

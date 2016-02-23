@@ -6,6 +6,8 @@ import (
 
 	semver "github.com/hashicorp/go-version"
 	idl "go.iondynamics.net/iDlogger"
+
+	"go.iondynamics.net/siteMgr/msgType"
 )
 
 type User struct {
@@ -26,7 +28,7 @@ type Site struct {
 }
 
 type Message struct {
-	Type    string
+	Type    msgType.Code
 	Body    []byte
 	Version string
 }
