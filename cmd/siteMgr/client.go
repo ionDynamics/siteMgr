@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/sha512"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"net"
@@ -31,8 +32,9 @@ var (
 	debug      = flag.Bool("debug", false, "Enable debug logging")
 	server     = flag.String("server", "sitemgr.ion.onl:9210", "siteMgr-server host:port")
 	autoupdate = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
+	insecure   = flag.Bool("insecure", false, "Allow insecure connections")
 
-	VERSION = "0.4.0"
+	VERSION = "0.5.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -101,8 +103,9 @@ func main() {
 		var conn net.Conn
 		var err error
 		for i := 1; i <= 5; i++ {
-			conn, err = net.Dial("tcp", *server)
+			conn, err = tls.Dial("tcp", *server, &tls.Config{InsecureSkipVerify: *insecure})
 			if err != nil {
+				idl.Debug(err)
 				dur := time.Duration(i) * 5 * time.Second
 				say("Connection could not be established!")
 				say("Retrying in", dur)
@@ -203,7 +206,11 @@ func main() {
 
 			case msgType.NOTICE:
 				say("Notice from server:", string(msg.Body))
+
+			case msgType.CLIPCONTENT:
+				clip(string(msg.Body))
 			}
+
 		}
 		say("Connection lost")
 		say("Retrying...")

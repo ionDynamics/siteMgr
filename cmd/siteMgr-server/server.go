@@ -1,10 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	html "html/template"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -26,17 +26,17 @@ import (
 )
 
 var (
-	debug          = flag.Bool("debug", false, "Enable debug output")
-	httpListener   = flag.String("http", ":9211", "Bind HTTP-Listener to ...")
-	clientListener = flag.String("client", ":9210", "Bind Client-Listener to ...")
-	autoupdate     = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
+	debug        = flag.Bool("debug", false, "Enable debug output")
+	httpListen   = flag.String("http", ":9211", "Bind HTTP-Listener to ...")
+	clientListen = flag.String("client", ":9210", "Bind Client-Listener to ...")
+	autoupdate   = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
+	pemCertPath  = flag.String("pemCertPath", "", "Path to pem-encoded certificate")
+	pemKeyPath   = flag.String("pemKeyPath", "", "Path to pem-encoded key")
 
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	key = []byte{0x42, 0x89, 0x10, 0x01, 0x07, 0xAC, 0xDC, 0x77, 0x70, 0x07, 0x66, 0x6B, 0xCD, 0xFF, 0x13, 0xCC}
-
-	VERSION = "0.5.0"
+	VERSION = "0.6.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -47,7 +47,8 @@ var (
 		CmdName:        "siteMgr-server", // app name
 	}
 
-	lcs string
+	cert tls.Certificate
+	lcs  string
 )
 
 func main() {
@@ -56,7 +57,18 @@ func main() {
 
 	VERSION = strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(VERSION), "'"), "'")
 	idl.Info("Version: ", VERSION)
+
+	if *pemCertPath == "" || *pemKeyPath == "" {
+		idl.Emerg("Specify --pemCertPath and --pemKeyPath")
+	}
+
 	idl.Info("Starting...")
+
+	var err error
+	cert, err = tls.LoadX509KeyPair(*pemCertPath, *pemKeyPath)
+	if err != nil {
+		idl.Emerg(err)
+	}
 
 	encoder.Init(VERSION)
 	update()
@@ -156,13 +168,16 @@ func setupHttp() {
 	route.Init(e, getClientAddress)
 	e.HTTP2(true)
 
-	idl.Info("HTTP on", *httpListener)
-	go e.Run(*httpListener)
+	idl.Info("HTTP on", *httpListen)
+	go e.RunTLS(*httpListen, *pemCertPath, *pemKeyPath)
 }
 
 func runClientListener() {
-	idl.Info("Listener on", *clientListener)
-	ln, err := net.Listen("tcp", *clientListener)
+	cfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+	idl.Info("Listener on", *clientListen)
+	ln, err := tls.Listen("tcp", *clientListen, cfg)
 	if err != nil {
 		idl.Emerg(err)
 		return

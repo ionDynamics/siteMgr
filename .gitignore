@@ -24,3 +24,4 @@ _testmain.go
 *.prof
 .goxc.json
 build.sh
+cmd/siteMgr-server/siteMgr.db

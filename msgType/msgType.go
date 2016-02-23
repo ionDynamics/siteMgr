@@ -11,6 +11,7 @@ const (
 	LOGOUT
 	UPDATE_AVAIL
 	NOTICE
+	CLIPCONTENT
 )
 
 func (c Code) String() string {
@@ -34,6 +35,9 @@ func (c Code) String() string {
 
 	case NOTICE:
 		return "NOTICE"
+
+	case CLIPCONTENT:
+		return "CLIPCONTENT"
 
 	default:
 		return "UNKNOWN"

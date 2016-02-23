@@ -24,7 +24,7 @@ type Site struct {
 	Version  string
 	Template string
 	Email    string
-	//Password string
+	Password string
 }
 
 type Message struct {
