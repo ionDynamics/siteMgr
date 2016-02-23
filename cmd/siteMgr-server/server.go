@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/GeertJohan/go.rice"
-	"github.com/GeorgeMac/idicon/icon"
 	"github.com/labstack/echo"
 	"go.iondynamics.net/go-selfupdate"
 	"go.iondynamics.net/iDechoLog"
@@ -21,10 +20,7 @@ import (
 	"go.iondynamics.net/kvStore/backend/bolt"
 	"go.iondynamics.net/templice"
 
-	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
-	"go.iondynamics.net/siteMgr/msgType"
-	reg "go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/route"
 	"go.iondynamics.net/siteMgr/srv/template"
 )
@@ -40,7 +36,7 @@ var (
 
 	key = []byte{0x42, 0x89, 0x10, 0x01, 0x07, 0xAC, 0xDC, 0x77, 0x70, 0x07, 0x66, 0x6B, 0xCD, 0xFF, 0x13, 0xCC}
 
-	VERSION = "0.4.0"
+	VERSION = "0.5.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -177,194 +173,5 @@ func runClientListener() {
 			idl.Err(err)
 		}
 		go handleConnection(conn)
-	}
-}
-
-func setIdenticon(name, hash string) {
-	if hash != "" {
-		props := icon.DefaultProps()
-		props.Size = 21
-		props.Padding = 0
-		props.BorderRadius = 7
-		generator, err := icon.NewGenerator(5, 5, icon.With(props))
-		if err != nil {
-			idl.Err(err)
-			return
-		}
-		icn := generator.Generate([]byte(hash))
-
-		mu.Lock()
-		inf := cim[name]
-		inf.Identicon = html.HTML(icn.String())
-		cim[name] = inf
-		mu.Unlock()
-	}
-}
-
-func setClientMsgVersion(name, ver string) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	inf := cim[name]
-	inf.MsgVersion = ver
-	cim[name] = inf
-}
-
-func setClientInfo(name, vendor, client, variant, address string) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	inf := cim[name]
-	inf.Vendor = vendor
-	inf.Client = client
-	inf.Variant = variant
-	inf.Address = address
-	cim[name] = inf
-}
-
-func getClientInfo(user string) clientInfo {
-	mu.RLock()
-	defer mu.RUnlock()
-	return cim[user]
-}
-
-func delClientInfo(user string) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	delete(cim, user)
-}
-
-func getClientAddress(user string) string {
-	return getClientInfo(user).Address
-}
-
-type clientInfo struct {
-	Identicon  html.HTML
-	MsgVersion string
-	Vendor     string
-	Client     string
-	Variant    string
-	Address    string
-}
-
-func handleConnection(c net.Conn) {
-	defer c.Close()
-
-	enc := json.NewEncoder(c)
-	dec := json.NewDecoder(c)
-	msg := &siteMgr.Message{}
-	usr := siteMgr.NewUser()
-
-	var hash string
-
-	var authed bool
-	for !authed && dec.More() {
-		if err := dec.Decode(msg); err != nil {
-			idl.Err("decoding message:", err)
-		}
-		err := json.Unmarshal(msg.Body, usr)
-		if err != nil {
-			idl.Err("unmarshal body:", err)
-			idl.Debug("ouch:", string(msg.Body))
-			return
-		}
-
-		if siteMgr.AtLeast("0.1.0", msg) {
-			hash = usr.Sites["identicon-hash"].Name
-			setClientMsgVersion(usr.Name, msg.Version)
-		}
-		if siteMgr.AtLeast("0.2.0", msg) {
-			cl := usr.Sites["client"]
-
-			host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
-			setClientInfo(usr.Name, cl.Name, cl.Login, cl.Version, host)
-		}
-
-		msg.Version = VERSION
-		msg.Body = []byte{}
-		if usr.Login() == nil {
-			idl.Debug("Login success")
-			authed = true
-			msg.Type = msgType.LOGIN_SUCCESS
-		} else {
-			msg.Type = msgType.LOGIN_ERROR
-		}
-
-		idl.Debug("Sending message", msg)
-		err = enc.Encode(msg)
-		if err != nil {
-			idl.Err(err)
-		}
-	}
-
-	if !authed {
-		return
-	}
-
-	idl.Debug("User Client logged in: ", usr.Name)
-
-	closed := make(chan bool)
-	go func() {
-		gomsg := &siteMgr.Message{}
-		for dec.More() {
-			err := dec.Decode(gomsg)
-			if err != nil {
-				continue
-			}
-			if gomsg.Type == msgType.LOGOUT {
-				idl.Debug("client logout: ", usr.Name)
-				break
-			}
-		}
-		closed <- true
-	}()
-
-	setIdenticon(usr.Name, hash)
-
-	ch := make(chan siteMgr.Message, 1)
-	idl.Debug("registering channel ", usr.Name, ch)
-	reg.Set(usr.Name, ch)
-
-loop:
-	for {
-		idl.Debug("ready for sending messages")
-		var err error
-		var send siteMgr.Message
-		select {
-		case send = <-ch:
-			idl.Debug("channel sent msg")
-		case <-time.After(3 * time.Minute):
-			send, err = encoder.Do(msgType.HEARTBEAT)
-			if err != nil {
-				idl.Err(err)
-				continue loop
-			}
-		case <-closed:
-			break loop
-		}
-		idl.Debug("Sending message", send)
-		err = enc.Encode(send)
-		if err != nil {
-			idl.Warn(err)
-			break
-		}
-	}
-
-	delClientInfo(usr.Name)
-	reg.Del(usr.Name)
-	idl.Debug("connection handler shutdown")
-}
-
-func broadcast(msg siteMgr.Message) {
-	mu.RLock()
-	defer mu.RUnlock()
-
-	for name, _ := range cim {
-		ch := reg.Get(name)
-		if ch == nil {
-			continue
-		}
-		ch <- msg
 	}
 }
