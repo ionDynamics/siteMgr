@@ -34,12 +34,22 @@ func recvLoop(send chan siteMgr.Message, c net.Conn, abort *bool) *siteMgr.User 
 	usr := siteMgr.NewUser()
 	dec := json.NewDecoder(c)
 	authFails := 0
+	errCount := 0
 
 recvLoop:
 	for dec.More() && !*abort {
 		err := dec.Decode(msg)
 		if err != nil {
 			idl.Warn(err)
+			errCount++
+			if errCount > 100 {
+				fail, err := encoder.Do("too many faulty messages")
+				if err == nil {
+					send <- fail
+					<-time.After(3 * time.Second)
+				}
+				break recvLoop
+			}
 			continue recvLoop
 		}
 

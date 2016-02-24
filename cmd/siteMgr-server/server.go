@@ -36,7 +36,7 @@ var (
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	VERSION = "0.7.0"
+	VERSION = "0.7.1"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -113,7 +113,7 @@ func latestClientVersion() string {
 	defer resp.Body.Close()
 	dec := json.NewDecoder(resp.Body)
 	m := make(map[string]string)
-	err = dec.Decode(m)
+	err = dec.Decode(&m)
 	if err != nil {
 		idl.Err("latestClientVersion", err)
 	}
