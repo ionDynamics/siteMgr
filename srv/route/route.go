@@ -11,6 +11,7 @@ import (
 
 	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
+	"go.iondynamics.net/siteMgr/msgType"
 	"go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/session"
 )
@@ -183,6 +184,30 @@ func Init(e *echo.Echo, fn func(string) string) {
 		}
 
 		return c.Redirect(http.StatusFound, "/backup/mgr")
+	})
+
+	e.Post("/clip/send", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+		ch := registry.Get(usr.Name)
+		if ch != nil {
+			idl.Debug(ch)
+			cc := c.Form("clip-content")
+			idl.Debug()
+
+			idl.Debug("sending content to client: ", usr.Name)
+			msg, err := encoder.Do(cc)
+			msg.Type = msgType.CLIPCONTENT
+			if err != nil {
+				return err
+			}
+			ch <- msg
+		} else {
+			idl.Debug("nil channel")
+		}
+		return c.Redirect(http.StatusFound, "/site/list")
 	})
 
 	e.Get("/logout", func(c *echo.Context) error {

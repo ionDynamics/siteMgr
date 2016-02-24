@@ -13,9 +13,8 @@ import (
 type User struct {
 	Name     string
 	Password string
-	//Fullname string
-	m     sync.RWMutex
-	Sites map[string]Site
+	m        sync.RWMutex
+	Sites    map[string]Site
 }
 
 type Site struct {
@@ -24,7 +23,6 @@ type Site struct {
 	Version  string
 	Template string
 	Email    string
-	Password string
 }
 
 type Message struct {
