@@ -30,11 +30,11 @@ var (
 	noEnv      = flag.Bool("no-env", false, "Set this to true if no environment variables should be used")
 	noTerminal = flag.Bool("no-terminal", false, "Set this to true if your standard input isn't a terminal")
 	debug      = flag.Bool("debug", false, "Enable debug logging")
-	server     = flag.String("server", "sitemgr.ion.onl:9210", "siteMgr-server host:port")
+	server     = flag.String("server", "mgr.slpw.de:9210", "siteMgr-server host:port")
 	autoupdate = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 	insecure   = flag.Bool("insecure", false, "Allow insecure connections")
 
-	VERSION = "0.5.0"
+	VERSION = "0.5.1"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,

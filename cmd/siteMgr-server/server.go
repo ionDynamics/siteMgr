@@ -27,7 +27,7 @@ import (
 
 var (
 	debug        = flag.Bool("debug", false, "Enable debug output")
-	httpsListen  = flag.String("httpsBind", "localhost:9211", "Bind HTTP-Listener to ...")
+	httpListen   = flag.String("httpBind", "localhost:9211", "Bind HTTP-Listener to ...")
 	clientListen = flag.String("clientBind", ":9210", "Bind Client-Listener to ...")
 	autoupdate   = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 	pemCertPath  = flag.String("pemCertPath", "", "Path to pem-encoded certificate")
@@ -36,7 +36,7 @@ var (
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	VERSION = "0.7.1"
+	VERSION = "0.7.3"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -168,8 +168,8 @@ func setupHttp() {
 	route.Init(e, getClientAddress)
 	e.HTTP2(true)
 
-	idl.Info("HTTP on", *httpsListen)
-	go e.RunTLS(*httpsListen, *pemCertPath, *pemKeyPath)
+	idl.Info("HTTP on", *httpListen)
+	go e.Run(*httpListen)
 }
 
 func runClientListener() {

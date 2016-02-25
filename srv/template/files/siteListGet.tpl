@@ -66,12 +66,16 @@
 					{{ if eq .Template "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}} Printable32{{else}}{{.Template}} {{end}}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}
 				</td>
 				<td>
-					{{.Login}}
-					<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.Login}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{with .Login}}						
+						{{.}}
+						<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{end}}
 				</td>
 				<td>
-					{{.Email}}
-					<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.Email}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{with .Email}}
+						{{.}}
+						<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{end}}
 				</td>
 				<td>
 					<form action="/site/send" method="post">
