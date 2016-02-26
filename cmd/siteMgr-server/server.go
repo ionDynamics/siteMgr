@@ -32,11 +32,12 @@ var (
 	autoupdate   = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 	pemCertPath  = flag.String("pemCertPath", "", "Path to pem-encoded certificate")
 	pemKeyPath   = flag.String("pemKeyPath", "", "Path to pem-encoded key")
+	noHTTPS      = flag.Bool("noHTTPS", false, "Use given certificate for HTTPS")
 
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	VERSION = "0.7.3"
+	VERSION = "0.7.4"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -168,15 +169,21 @@ func setupHttp() {
 	route.Init(e, getClientAddress)
 	e.HTTP2(true)
 
-	idl.Info("HTTP on", *httpListen)
-	go e.Run(*httpListen)
+	if *noHTTPS {
+		idl.Info("HTTP on ", *httpListen)
+		go e.Run(*httpListen)
+		return
+	}
+
+	idl.Info("HTTPS on ", *httpListen)
+	go e.RunTLS(*httpListen, *pemCertPath, *pemKeyPath)
 }
 
 func runClientListener() {
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
-	idl.Info("Listener on", *clientListen)
+	idl.Info("Listener on ", *clientListen)
 	ln, err := tls.Listen("tcp", *clientListen, cfg)
 	if err != nil {
 		idl.Emerg(err)
