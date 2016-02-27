@@ -33,5 +33,3 @@
 		</div>
 	</div>
 {{template "footer" .}}
-
-	"OutPath": "{{.Dest}}{{.PS}}{{.Version}}{{.PS}}{{.Os}}-{{.Arch}}",
