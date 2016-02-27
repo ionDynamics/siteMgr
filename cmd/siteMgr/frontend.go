@@ -134,7 +134,7 @@ func returnPw(pwch chan string) {
 func clip(str string) {
 	before, err := clipboard.ReadAll()
 	clipboard.WriteAll(str)
-	say("\a\nCopied to clipboard! ")
+	say("\aCopied to clipboard! ")
 	time.Sleep(5 * time.Second)
 	say("Restoring clipboard in 5 seconds...")
 	time.Sleep(5 * time.Second)
@@ -143,7 +143,7 @@ func clip(str string) {
 	} else {
 		clipboard.WriteAll(before)
 	}
-	say("\a\nClipboard restored")
+	say("\aClipboard restored")
 }
 
 func getString(s *bufio.Scanner) (string, error) {

@@ -20,6 +20,7 @@ import (
 	"go.iondynamics.net/kvStore/backend/bolt"
 	"go.iondynamics.net/templice"
 
+	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
 	"go.iondynamics.net/siteMgr/srv/route"
 	"go.iondynamics.net/siteMgr/srv/template"
@@ -37,7 +38,7 @@ var (
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	VERSION = "0.7.4"
+	VERSION = "0.8.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -144,6 +145,7 @@ func setupHttp() {
 			return VERSION
 		},
 		"clientInfo": getClientInfo,
+		"atLeast":    siteMgr.AtLeast,
 	}))
 
 	if *debug {
@@ -166,7 +168,7 @@ func setupHttp() {
 		return nil
 	})
 
-	route.Init(e, getClientAddress)
+	route.Init(e)
 	e.HTTP2(true)
 
 	if *noHTTPS {

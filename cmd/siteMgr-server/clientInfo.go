@@ -82,11 +82,11 @@ func saveClientInfo(msg *siteMgr.Message, c net.Conn, send chan siteMgr.Message)
 	usr := siteMgr.NewUser()
 	json.Unmarshal(msg.Body, usr)
 
-	if siteMgr.AtLeast("0.1.0", msg) {
+	if siteMgr.AtLeast("0.1.0", msg.Version) {
 		hash = usr.Sites["identicon-hash"].Name
 		setClientMsgVersion(usr.Name, msg.Version)
 	}
-	if siteMgr.AtLeast("0.2.0", msg) {
+	if siteMgr.AtLeast("0.2.0", msg.Version) {
 		cl := usr.Sites["client"]
 
 		host, _, _ := net.SplitHostPort(c.RemoteAddr().String())

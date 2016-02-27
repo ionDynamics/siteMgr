@@ -1,6 +1,6 @@
 {{template "header" .}}
+{{$cinf := .Name | clientInfo}}
 {{with .Name}}
-	{{$cinf := . | clientInfo}}
 		<div class="row">
 			<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
 				<p>
@@ -34,6 +34,9 @@
 			</div>
 		</div>				
 {{end}}
+
+
+
 <div class="row">
 	<div class="col-xs-12">
 
@@ -48,7 +51,7 @@
 				<th>Email</th>
 				<th>&nbsp;</th>
 			</tr>
-			{{range .Sites}}
+			{{range .GetSites}}
 			<tr>
 				<td>
 					{{.Name}}
@@ -94,14 +97,68 @@
 		</table>
 	</div>
 </div>
+{{if atLeast "0.6.0" $cinf.MsgVersion}}
+<div class="row">
+	<div class="col-xs-12">
+
+		<h2>My Credentials</h2>
+
+		<table class="table table-bordered table-hover table-striped">
+			<tr>
+				<th>Name</th>
+				<th>Login</th>
+				<th>Email</th>
+				<th>&nbsp;</th>
+			</tr>
+			{{range .GetAllCredentials}}
+			<tr>
+				<td>
+					{{.Name}}
+				</td>
+				<td>
+					{{with .Login}}						
+						{{.}}
+						<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{end}}
+				</td>
+				<td>
+					{{with .Email}}
+						{{.}}
+						<form action="/clip/send" method="post" class="pull-right"><input type="hidden" name="clip-content" value="{{.}}"><button class="btn btn-default" type="submit"><span class="glyphicon glyphicon-copy"></span></button></form>
+					{{end}}
+				</td>
+				<td>
+					<form action="/credentials/send" method="post">
+						<input type="hidden" name="credentials-name" value="{{.Name}}">
+						<button class="btn btn-primary pull-left" type="submit">Password</button>
+					</form>
+
+					<form action="/credentials/del" method="post">
+						<input type="hidden" name="credentials-name" value="{{.Name}}">
+						<button class="btn pull-left" id="delBtn" x-data-del="{{.Name}}" type="submit">Delete</button>
+						<button class="btn pull-right btn-danger hidden" id="confirmBtn" type="submit">Confirm</button>
+					</form>
+				</td>
+			</tr>
+			{{end}}
+		</table>
+	</div>
+</div>
+{{end}}
 
 <div class="row">
-	<div class="col-xs-12 col-sm-6 col-sm-offset-3">
+	<div class="col-xs-12 col-sm-6 col-sm-offset-3 col-md-offset-0">
 		<div class="well">
 			<h3>New Site:</h3>
 			<form action="/site/set" method="post">
 				<div class="form-group">
 					<input type="text" class="form-control" name="site-name" placeholder="Site URL" required>
+				</div>				
+				<div class="form-group">
+					<input type="text" class="form-control" name="site-login" placeholder="Login">
+				</div>
+				<div class="form-group">
+					<input type="text" class="form-control" name="site-email" placeholder="E-Mail">
 				</div>
 				<div class="form-group">
 					<input type="text" class="form-control" name="site-version" placeholder="Password Version" value="1">
@@ -119,17 +176,38 @@
 					<!--<input type="text" class="form-control" name="site-template" placeholder="Password Template">-->
 				</div>
 				<div class="form-group">
-					<input type="text" class="form-control" name="site-login" placeholder="Login">
-				</div>
-				<div class="form-group">
-					<input type="text" class="form-control" name="site-email" placeholder="E-Mail">
-				</div>
-				<div class="form-group">
 					<button class="btn btn-primary" type="submit">Add Site</button>
 				</div>
 			</form>
 		</div>
 	</div>
+	{{if atLeast "0.6.0" $cinf.MsgVersion}}
+		<div class="col-xs-12 col-sm-6 col-sm-offset-3 col-md-offset-0">
+			<div class="well">
+				<h3>New Credentials:</h3>
+				<form action="/credentials/set" method="post" autocomplete="off">
+					<div class="form-group">
+						<input type="text" class="form-control" name="credentials-name" placeholder="Site URL" required>
+					</div>		
+					<div class="form-group">
+						<input type="text" class="form-control" name="credentials-login" placeholder="Login">
+					</div>
+					<div class="form-group">
+						<input type="text" class="form-control" name="credentials-email" placeholder="E-Mail" autocomplete="off">
+					</div>
+					<div class="form-group">
+						<input type="password" class="form-control" name="credentials-pass" placeholder="Password" autocomplete="off">
+					</div>
+					<div class="form-group">
+						<input type="password" class="form-control" name="credentials-pass-repeat" placeholder="Repeat Password" autocomplete="off">
+					</div>
+					<div class="form-group">
+						<button class="btn btn-primary" type="submit">Add Credentials</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	{{end}}
 </div>
 
 {{template "footer" .}}

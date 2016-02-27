@@ -36,6 +36,10 @@ func Do(v interface{}) (msg siteMgr.Message, err error) {
 		msg.Type = msgType.NOTICE
 		msg.Body = []byte(t)
 
+	case siteMgr.Credentials, *siteMgr.Credentials:
+		msg.Type = msgType.ENC_CREDENTIALS
+		msg.Body, err = json.Marshal(t)
+
 	default:
 		err = errors.New("can't encode interface to message")
 	}

@@ -11,6 +11,7 @@ import (
 	"go.iondynamics.net/siteMgr/encoder"
 	"go.iondynamics.net/siteMgr/msgType"
 	reg "go.iondynamics.net/siteMgr/srv/registry"
+	"go.iondynamics.net/siteMgr/srv/session"
 )
 
 func handleConnection(c net.Conn) {
@@ -35,22 +36,28 @@ func recvLoop(send chan siteMgr.Message, c net.Conn, abort *bool) *siteMgr.User 
 	dec := json.NewDecoder(c)
 	authFails := 0
 	errCount := 0
+	authed := false
 
 recvLoop:
 	for dec.More() && !*abort {
+		if errCount > 10 {
+			fail, err := encoder.Do("too many faulty messages")
+			if err == nil {
+				send <- fail
+				<-time.After(3 * time.Second)
+			}
+			break recvLoop
+		}
+
 		err := dec.Decode(msg)
 		if err != nil {
 			idl.Warn(err)
 			errCount++
-			if errCount > 100 {
-				fail, err := encoder.Do("too many faulty messages")
-				if err == nil {
-					send <- fail
-					<-time.After(3 * time.Second)
-				}
-				break recvLoop
-			}
 			continue recvLoop
+		}
+
+		if authed {
+			session.Set(session.GetKeyByName(usr.Name), usr)
 		}
 
 		switch msg.Type {
@@ -63,12 +70,33 @@ recvLoop:
 			usr = siteMgr.NewUser()
 			if !auth(send, msg, usr) {
 				authFails++
+				authed = false
 			} else {
 				saveClientInfo(msg, c, send)
+				authed = true
+			}
+
+		case msgType.ENC_CREDENTIALS:
+			cred := &siteMgr.Credentials{}
+			err := json.Unmarshal(msg.Body, cred)
+			if err != nil {
+				errCount++
+				idl.Warn(err)
+				continue recvLoop
+			}
+			err = usr.SetCredentials(*cred)
+			if err != nil {
+				idl.Err(err)
+				continue recvLoop
 			}
 
 		default:
+			errCount++
 			idl.Warn("msg not handled", msg)
+			say, err := encoder.Do("message not handled")
+			if err == nil {
+				send <- say
+			}
 		}
 
 		if authFails > 2 {

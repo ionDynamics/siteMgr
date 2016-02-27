@@ -16,7 +16,7 @@ import (
 	"go.iondynamics.net/siteMgr/srv/session"
 )
 
-func Init(e *echo.Echo, fn func(string) string) {
+func Init(e *echo.Echo) {
 	e.Get("/", func(c *echo.Context) error {
 		return c.Redirect(http.StatusFound, "/site/list")
 	})
@@ -207,6 +207,76 @@ func Init(e *echo.Echo, fn func(string) string) {
 		} else {
 			idl.Debug("nil channel")
 		}
+		return c.Redirect(http.StatusFound, "/site/list")
+	})
+
+	e.Post("/credentials/set", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+
+		//TODO better/actual error handling
+		if c.Form("credentials-pass") != c.Form("credentials-pass-repeat") {
+			idl.Debug("passwords don't match")
+			return c.Redirect(http.StatusFound, "/site/list")
+		}
+
+		ch := registry.Get(usr.Name)
+		if ch == nil {
+			return c.Render(http.StatusOK, "clientGet.tpl", usr)
+		}
+
+		cred, err := encoder.Do(siteMgr.Credentials{
+			Name:     c.Form("credentials-name"),
+			Login:    c.Form("credentials-login"),
+			Email:    c.Form("credentials-email"),
+			Password: c.Form("credentials-pass"),
+		})
+		if err != nil {
+			return err
+		}
+		cred.Type = msgType.DEC_CREDENTIALS
+		ch <- cred
+		<-time.After(time.Second)
+		return c.Redirect(http.StatusFound, "/site/list")
+	})
+
+	e.Post("/credentials/send", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+		ch := registry.Get(usr.Name)
+		if ch != nil {
+			idl.Debug(ch)
+			cred := usr.GetCredentials(c.Form("credentials-name"))
+			idl.Debug(cred)
+
+			idl.Debug("sending cred to client: ", usr.Name)
+			msg, err := encoder.Do(cred)
+			if err != nil {
+				return err
+			}
+			ch <- msg
+		} else {
+			idl.Debug("nil channel")
+		}
+		return c.Redirect(http.StatusFound, "/site/list")
+	})
+
+	e.Post("/credentials/del", func(c *echo.Context) error {
+		usr := getUser(c)
+		if usr == nil {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+
+		err := usr.DelCredentials(c.Form("credentials-name"))
+		if err != nil {
+			idl.Debug(err)
+			return err
+		}
+
 		return c.Redirect(http.StatusFound, "/site/list")
 	})
 

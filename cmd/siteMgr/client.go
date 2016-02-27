@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"go.iondynamics.net/go-selfupdate"
+	"go.iondynamics.net/iDhelper/crypto"
 	idl "go.iondynamics.net/iDlogger"
 	"go.iondynamics.net/reProc"
 	"go.iondynamics.net/statelessPassword"
@@ -34,7 +35,7 @@ var (
 	autoupdate = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
 	insecure   = flag.Bool("insecure", false, "Allow insecure connections")
 
-	VERSION = "0.5.1"
+	VERSION = "0.6.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -209,6 +210,53 @@ func main() {
 
 			case msgType.CLIPCONTENT:
 				clip(string(msg.Body))
+
+			case msgType.DEC_CREDENTIALS:
+				sites <- &siteMgr.Site{
+					Name:     "Internal Crypto Key",
+					Version:  "version1",
+					Template: statelessPassword.Printable32Templates[0],
+				}
+
+				cred := &siteMgr.Credentials{}
+				err := json.Unmarshal(msg.Body, cred)
+				pw := <-pwd
+				if err != nil {
+					idl.Err(err)
+					continue
+				}
+
+				cred.Password = crypto.Encrypt(pw, cred.Password)
+				cred.Version = "version1"
+
+				ret, err := encoder.Do(cred)
+				if err != nil {
+					idl.Err(err)
+					continue
+				}
+
+				err = enc.Encode(ret)
+				if err != nil {
+					idl.Err(err)
+				}
+
+			case msgType.ENC_CREDENTIALS:
+				sites <- &siteMgr.Site{
+					Name:     "Internal Crypto Key",
+					Version:  "version1",
+					Template: statelessPassword.Printable32Templates[0],
+				}
+
+				cred := &siteMgr.Credentials{}
+				err := json.Unmarshal(msg.Body, cred)
+				pw := <-pwd
+				if err != nil {
+					idl.Err(err)
+					continue
+				}
+
+				clip(crypto.Decrypt(pw, cred.Password))
+
 			}
 
 		}

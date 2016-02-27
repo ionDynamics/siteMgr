@@ -11,10 +11,11 @@ import (
 )
 
 type User struct {
-	Name     string
-	Password string
-	m        sync.RWMutex
-	Sites    map[string]Site
+	Name        string
+	Password    string
+	m           sync.RWMutex
+	Sites       map[string]Site
+	Credentials map[string]Credentials
 }
 
 type Site struct {
@@ -31,9 +32,18 @@ type Message struct {
 	Version string
 }
 
+type Credentials struct {
+	Name     string
+	Login    string
+	Email    string
+	Password string
+	Version  string
+}
+
 func NewUser() *User {
 	return &User{
-		Sites: make(map[string]Site),
+		Sites:       make(map[string]Site),
+		Credentials: make(map[string]Credentials),
 	}
 }
 
@@ -109,18 +119,53 @@ func (u *User) DelSite(s string) error {
 	return u.Upsert()
 }
 
-func AtLeast(str string, msg *Message) bool {
-	constraint, err := semver.NewConstraint(">= " + str)
+func (u *User) SetCredentials(c Credentials) error {
+	u.m.Lock()
+	defer u.m.Unlock()
+
+	u.Credentials[c.Name] = c
+	return u.Upsert()
+}
+
+func (u *User) GetCredentials(name string) Credentials {
+	u.m.RLock()
+	defer u.m.RUnlock()
+
+	return u.Credentials[name]
+}
+
+func (u *User) GetAllCredentials() []Credentials {
+	u.m.RLock()
+	defer u.m.RUnlock()
+
+	credentials := []Credentials{}
+	for _, credential := range u.Credentials {
+		credentials = append(credentials, credential)
+	}
+
+	return credentials
+}
+
+func (u *User) DelCredentials(name string) error {
+	u.m.Lock()
+	defer u.m.Unlock()
+
+	delete(u.Credentials, name)
+	return u.Upsert()
+}
+
+func AtLeast(constraint, version string) bool {
+	c, err := semver.NewConstraint(">= " + constraint)
 	if err != nil {
 		idl.Err(err)
 		return false
 	}
 
-	v, err := semver.NewVersion(msg.Version)
+	v, err := semver.NewVersion(version)
 	if err != nil {
 		idl.Debug(err)
 		return false
 	}
 
-	return constraint.Check(v)
+	return c.Check(v)
 }

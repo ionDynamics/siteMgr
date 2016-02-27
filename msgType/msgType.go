@@ -12,6 +12,8 @@ const (
 	UPDATE_AVAIL
 	NOTICE
 	CLIPCONTENT
+	DEC_CREDENTIALS
+	ENC_CREDENTIALS
 )
 
 func (c Code) String() string {
@@ -38,6 +40,12 @@ func (c Code) String() string {
 
 	case CLIPCONTENT:
 		return "CLIPCONTENT"
+
+	case DEC_CREDENTIALS:
+		return "DEC_CREDENTIALS"
+
+	case ENC_CREDENTIALS:
+		return "ENC_CREDENTIALS"
 
 	default:
 		return "UNKNOWN"

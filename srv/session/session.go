@@ -9,8 +9,9 @@ import (
 	"go.iondynamics.net/siteMgr"
 )
 
-var d map[string]*siteMgr.User = make(map[string]*siteMgr.User)
 var m sync.RWMutex
+var t map[string]*siteMgr.User = make(map[string]*siteMgr.User)
+var n map[string]*siteMgr.User = make(map[string]*siteMgr.User)
 
 func Start(usr *siteMgr.User) string {
 	k := randGen.String(64)
@@ -23,21 +24,41 @@ func Get(key string) *siteMgr.User {
 	m.RLock()
 	defer m.RUnlock()
 
-	return d[key]
+	return t[key]
+}
+
+func GetByName(name string) *siteMgr.User {
+	m.RLock()
+	defer m.RUnlock()
+
+	return n[name]
+}
+
+func GetKeyByName(name string) string {
+	m.RLock()
+	defer m.RUnlock()
+
+	for key, usr := range t {
+		if usr.Name == name {
+			return key
+		}
+	}
+	return ""
 }
 
 func Set(key string, usr *siteMgr.User) {
 	m.Lock()
 	defer m.Unlock()
 
-	d[key] = usr
+	t[key] = usr
+	n[usr.Name] = usr
 }
 
 func Del(key string) {
 	m.Lock()
 	defer m.Unlock()
 
-	delete(d, key)
+	delete(t, key)
 }
 
 func Timeout(key string, dur time.Duration) {
