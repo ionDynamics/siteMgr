@@ -32,6 +32,15 @@ func Get(key string) *siteMgr.User {
 	return n[name]
 }
 
+func Sync(usr *siteMgr.User) {
+	usr2 := GetByName(usr.Name)
+	if usr2 == nil {
+		SetUser(usr)
+	} else {
+		*usr = *usr2
+	}
+}
+
 func GetByName(name string) *siteMgr.User {
 	m.RLock()
 	defer m.RUnlock()

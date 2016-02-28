@@ -67,12 +67,7 @@ recvLoop:
 				authFails++
 			} else {
 				saveClientInfo(msg, c, send)
-				usr2 := session.GetByName(usr.Name)
-				if usr2 == nil {
-					session.SetUser(usr)
-				} else {
-					usr = usr2
-				}
+				session.Sync(usr)
 			}
 
 		case msgType.ENC_CREDENTIALS:

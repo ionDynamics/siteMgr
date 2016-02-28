@@ -55,6 +55,8 @@ func Init(e *echo.Echo) {
 			return err
 		}
 
+		session.Sync(usr)
+
 		expiration := time.Now().Add(10 * time.Hour)
 		cookie := http.Cookie{Name: "token", Value: session.Start(usr), Expires: expiration}
 		http.SetCookie(c.Response(), &cookie)
