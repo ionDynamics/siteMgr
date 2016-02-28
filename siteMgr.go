@@ -2,6 +2,7 @@ package siteMgr //import "go.iondynamics.net/siteMgr"
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	semver "github.com/hashicorp/go-version"
@@ -108,6 +109,8 @@ func (u *User) GetSites() []Site {
 		sites = append(sites, site)
 	}
 
+	sort.Sort(SiteSort(sites))
+
 	return sites
 }
 
@@ -143,6 +146,8 @@ func (u *User) GetAllCredentials() []Credentials {
 		credentials = append(credentials, credential)
 	}
 
+	sort.Sort(CredentialsSort(credentials))
+
 	return credentials
 }
 
@@ -169,3 +174,15 @@ func AtLeast(constraint, version string) bool {
 
 	return c.Check(v)
 }
+
+type SiteSort []Site
+
+func (a SiteSort) Len() int           { return len(a) }
+func (a SiteSort) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SiteSort) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+type CredentialsSort []Credentials
+
+func (a CredentialsSort) Len() int           { return len(a) }
+func (a CredentialsSort) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a CredentialsSort) Less(i, j int) bool { return a[i].Name < a[j].Name }

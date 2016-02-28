@@ -88,8 +88,8 @@
 
 					<form action="/site/del" method="post">
 						<input type="hidden" name="site-name" value="{{.Name}}">
-						<button class="btn pull-left" id="delBtn" x-data-del="{{.Name}}" type="submit">Delete</button>
-						<button class="btn pull-right btn-danger hidden" id="confirmBtn" type="submit">Confirm</button>
+						<button class="btn pull-left delBtn" x-data-del="{{.Name}}" type="submit">Delete</button>
+						<button class="btn pull-right btn-danger hidden confirmBtn" type="submit">Confirm</button>
 					</form>
 				</td>
 			</tr>
@@ -135,8 +135,8 @@
 
 					<form action="/credentials/del" method="post">
 						<input type="hidden" name="credentials-name" value="{{.Name}}">
-						<button class="btn pull-left" id="delBtn" x-data-del="{{.Name}}" type="submit">Delete</button>
-						<button class="btn pull-right btn-danger hidden" id="confirmBtn" type="submit">Confirm</button>
+						<button class="btn pull-left delBtn" x-data-del="{{.Name}}" type="submit">Delete</button>
+						<button class="btn pull-right btn-danger hidden confirmBtn" type="submit">Confirm</button>
 					</form>
 				</td>
 			</tr>

@@ -36,7 +36,6 @@ func recvLoop(send chan siteMgr.Message, c net.Conn, abort *bool) *siteMgr.User 
 	dec := json.NewDecoder(c)
 	authFails := 0
 	errCount := 0
-	authed := false
 
 recvLoop:
 	for dec.More() && !*abort {
@@ -56,10 +55,6 @@ recvLoop:
 			continue recvLoop
 		}
 
-		if authed {
-			session.Set(session.GetKeyByName(usr.Name), usr)
-		}
-
 		switch msg.Type {
 		case msgType.LOGOUT:
 			idl.Debug("client logout: ", usr.Name)
@@ -70,10 +65,14 @@ recvLoop:
 			usr = siteMgr.NewUser()
 			if !auth(send, msg, usr) {
 				authFails++
-				authed = false
 			} else {
 				saveClientInfo(msg, c, send)
-				authed = true
+				usr2 := session.GetByName(usr.Name)
+				if usr2 == nil {
+					session.SetUser(usr)
+				} else {
+					usr = usr2
+				}
 			}
 
 		case msgType.ENC_CREDENTIALS:

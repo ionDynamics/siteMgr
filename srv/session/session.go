@@ -10,7 +10,7 @@ import (
 )
 
 var m sync.RWMutex
-var t map[string]*siteMgr.User = make(map[string]*siteMgr.User)
+var t map[string]string = make(map[string]string)
 var n map[string]*siteMgr.User = make(map[string]*siteMgr.User)
 
 func Start(usr *siteMgr.User) string {
@@ -24,22 +24,32 @@ func Get(key string) *siteMgr.User {
 	m.RLock()
 	defer m.RUnlock()
 
-	return t[key]
+	name, ok := t[key]
+	if !ok {
+		return nil
+	}
+
+	return n[name]
 }
 
 func GetByName(name string) *siteMgr.User {
 	m.RLock()
 	defer m.RUnlock()
 
-	return n[name]
+	usr, ok := n[name]
+	if !ok {
+		return nil
+	}
+
+	return usr
 }
 
 func GetKeyByName(name string) string {
 	m.RLock()
 	defer m.RUnlock()
 
-	for key, usr := range t {
-		if usr.Name == name {
+	for key, uname := range t {
+		if uname == name {
 			return key
 		}
 	}
@@ -50,7 +60,18 @@ func Set(key string, usr *siteMgr.User) {
 	m.Lock()
 	defer m.Unlock()
 
-	t[key] = usr
+	usr, ok := n[usr.Name]
+	if !ok {
+		n[usr.Name] = usr
+	}
+	t[key] = usr.Name
+
+}
+
+func SetUser(usr *siteMgr.User) {
+	m.Lock()
+	defer m.Unlock()
+
 	n[usr.Name] = usr
 }
 

@@ -38,7 +38,7 @@ var (
 	mu  sync.RWMutex
 	cim map[string]clientInfo = make(map[string]clientInfo)
 
-	VERSION = "0.8.1"
+	VERSION = "0.8.2"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
