@@ -9,7 +9,7 @@
 				</div>
 				<div class="row">
 					<div class="col-xs-12">
-						<p class="small text-center">Version: {{- serverVersion -}}</p>
+						<p class="small text-center">Version {{ serverVersion }} using Protocol {{ protocolVersion }}</p>
 					</div>
 				</div>
 			</div>

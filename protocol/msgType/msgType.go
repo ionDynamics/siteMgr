@@ -1,4 +1,4 @@
-package msgType //import "go.iondynamics.net/siteMgr/msgType"
+package msgType //import "go.iondynamics.net/siteMgr/protocol/msgType"
 
 type Code uint8
 
@@ -9,11 +9,13 @@ const (
 	LOGIN_SUCCESS
 	LOGIN_ERROR
 	LOGOUT
-	UPDATE_AVAIL
+	INCOMPATIBLE
 	NOTICE
 	CLIPCONTENT
 	DEC_CREDENTIALS
 	ENC_CREDENTIALS
+	CONNECTION_INFO
+	METRICS
 )
 
 func (c Code) String() string {
@@ -35,6 +37,9 @@ func (c Code) String() string {
 	case LOGOUT:
 		return "LOGOUT"
 
+	case INCOMPATIBLE:
+		return "INCOMPATIBLE"
+
 	case NOTICE:
 		return "NOTICE"
 
@@ -46,6 +51,12 @@ func (c Code) String() string {
 
 	case ENC_CREDENTIALS:
 		return "ENC_CREDENTIALS"
+
+	case CONNECTION_INFO:
+		return "CONNECTION_INFO"
+
+	case METRICS:
+		return "METRICS"
 
 	default:
 		return "UNKNOWN"

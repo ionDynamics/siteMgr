@@ -9,7 +9,9 @@ import (
 
 	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
-	"go.iondynamics.net/siteMgr/msgType"
+	"go.iondynamics.net/siteMgr/protocol"
+	"go.iondynamics.net/siteMgr/protocol/msgType"
+	"go.iondynamics.net/siteMgr/srv"
 	reg "go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/session"
 )
@@ -18,24 +20,25 @@ func handleConnection(c net.Conn) {
 	defer c.Close()
 	abort := false
 
-	send := make(chan siteMgr.Message, 1)
+	send := make(chan protocol.Message, 1)
 
 	go sendLoop(send, c, &abort)
 	usr := recvLoop(send, c, &abort)
 
 	abort = true
 	close(send)
-	cleanupClientInfo(usr)
+	cleanupConnectionInfo(usr)
 	idl.Debug("connection handler shutdown")
 }
 
-func recvLoop(send chan siteMgr.Message, c net.Conn, abort *bool) *siteMgr.User {
+func recvLoop(send chan protocol.Message, c net.Conn, abort *bool) *srv.User {
 	idl.Debug("Starting recvLoop")
-	msg := &siteMgr.Message{}
-	usr := siteMgr.NewUser()
+	msg := &protocol.Message{}
+	usr := srv.NewUser()
 	dec := json.NewDecoder(c)
 	authFails := 0
 	errCount := 0
+	authed := false
 
 recvLoop:
 	for dec.More() && !*abort {
@@ -55,19 +58,29 @@ recvLoop:
 			continue recvLoop
 		}
 
+		if !siteMgr.Constraint(protocolConstraint, msg.Version) {
+			incomp, err := encoder.Do(msgType.INCOMPATIBLE)
+			if err == nil {
+				send <- incomp
+				<-time.After(3 * time.Second)
+			}
+			break recvLoop
+		}
+
 		switch msg.Type {
 		case msgType.LOGOUT:
 			idl.Debug("client logout: ", usr.Name)
 			break recvLoop
 
 		case msgType.SITEMGR_USER:
-			cleanupClientInfo(usr)
-			usr = siteMgr.NewUser()
+			cleanupConnectionInfo(usr)
+			usr = srv.NewUser()
 			if !auth(send, msg, usr) {
 				authFails++
+				authed = false
 			} else {
-				saveClientInfo(msg, c, send)
 				session.Sync(usr)
+				authed = true
 			}
 
 		case msgType.ENC_CREDENTIALS:
@@ -83,6 +96,26 @@ recvLoop:
 				idl.Err(err)
 				continue recvLoop
 			}
+
+		case msgType.CONNECTION_INFO:
+			if !authed {
+				errCount++
+				continue recvLoop
+			}
+
+			conInfo := &siteMgr.ConnectionInfo{}
+			err := json.Unmarshal(msg.Body, conInfo)
+			if err != nil {
+				errCount++
+				idl.Warn(err)
+				continue recvLoop
+			}
+			if conInfo.ProtocolVersion != msg.Version {
+				errCount++
+				idl.Debug("conInfo.ProtocolVersion != msg.Version")
+				continue recvLoop
+			}
+			setConnectionInfo(usr, conInfo, c, send)
 
 		default:
 			errCount++
@@ -108,7 +141,7 @@ recvLoop:
 	return usr
 }
 
-func sendLoop(ch chan siteMgr.Message, c net.Conn, abort *bool) {
+func sendLoop(ch chan protocol.Message, c net.Conn, abort *bool) {
 	idl.Debug("Starting sendLoop")
 	enc := json.NewEncoder(c)
 	for msg := range ch {
@@ -124,7 +157,7 @@ func sendLoop(ch chan siteMgr.Message, c net.Conn, abort *bool) {
 	*abort = true
 }
 
-func auth(send chan siteMgr.Message, msg *siteMgr.Message, usr *siteMgr.User) bool {
+func auth(send chan protocol.Message, msg *protocol.Message, usr *srv.User) bool {
 	var authed bool
 
 	err := json.Unmarshal(msg.Body, usr)
@@ -134,7 +167,7 @@ func auth(send chan siteMgr.Message, msg *siteMgr.Message, usr *siteMgr.User) bo
 		return false
 	}
 
-	var loginresult siteMgr.Message
+	var loginresult protocol.Message
 	if usr.Login() == nil {
 		idl.Debug("Login success")
 		loginresult, err = encoder.Do(msgType.LOGIN_SUCCESS)
@@ -158,7 +191,7 @@ func auth(send chan siteMgr.Message, msg *siteMgr.Message, usr *siteMgr.User) bo
 	return authed
 }
 
-func broadcast(msg siteMgr.Message) {
+func broadcast(msg protocol.Message) {
 	mu.RLock()
 	defer mu.RUnlock()
 

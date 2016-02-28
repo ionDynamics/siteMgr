@@ -1,4 +1,4 @@
-package siteMgr //import "go.iondynamics.net/siteMgr"
+package persistence //import "go.iondynamics.net/siteMgr/srv/persistence"
 
 import (
 	"encoding/json"
@@ -6,9 +6,11 @@ import (
 	"go.iondynamics.net/iDhelper/crypto"
 	idl "go.iondynamics.net/iDlogger"
 	kv "go.iondynamics.net/kvStore"
+
+	"go.iondynamics.net/siteMgr"
 )
 
-func ReadUser(user string, pass string) (*User, error) {
+func ReadUser(user string, pass string) (*siteMgr.User, error) {
 	var str string
 	err := kv.Read([]byte("user"), []byte(user), &str)
 	if err != nil {
@@ -16,11 +18,11 @@ func ReadUser(user string, pass string) (*User, error) {
 	}
 
 	str = crypto.Decrypt(pass, str)
-	usr := NewUser()
+	usr := siteMgr.NewUser()
 	return usr, json.Unmarshal([]byte(str), usr)
 }
 
-func UpsertUser(u *User) error {
+func UpsertUser(u *siteMgr.User) error {
 	byt, err := json.Marshal(u)
 	if err != nil {
 		return err

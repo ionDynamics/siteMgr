@@ -6,21 +6,21 @@ import (
 
 	"go.iondynamics.net/iDhelper/randGen"
 
-	"go.iondynamics.net/siteMgr"
+	"go.iondynamics.net/siteMgr/srv"
 )
 
 var m sync.RWMutex
 var t map[string]string = make(map[string]string)
-var n map[string]*siteMgr.User = make(map[string]*siteMgr.User)
+var n map[string]*srv.User = make(map[string]*srv.User)
 
-func Start(usr *siteMgr.User) string {
+func Start(usr *srv.User) string {
 	k := randGen.String(64)
 	Set(k, usr)
 	Timeout(k, 10*time.Hour)
 	return k
 }
 
-func Get(key string) *siteMgr.User {
+func Get(key string) *srv.User {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -32,7 +32,7 @@ func Get(key string) *siteMgr.User {
 	return n[name]
 }
 
-func Sync(usr *siteMgr.User) {
+func Sync(usr *srv.User) {
 	usr2 := GetByName(usr.Name)
 	if usr2 == nil {
 		SetUser(usr)
@@ -41,7 +41,7 @@ func Sync(usr *siteMgr.User) {
 	}
 }
 
-func GetByName(name string) *siteMgr.User {
+func GetByName(name string) *srv.User {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -65,7 +65,7 @@ func GetKeyByName(name string) string {
 	return ""
 }
 
-func Set(key string, usr *siteMgr.User) {
+func Set(key string, usr *srv.User) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -77,7 +77,7 @@ func Set(key string, usr *siteMgr.User) {
 
 }
 
-func SetUser(usr *siteMgr.User) {
+func SetUser(usr *srv.User) {
 	m.Lock()
 	defer m.Unlock()
 

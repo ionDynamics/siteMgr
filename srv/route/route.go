@@ -11,7 +11,8 @@ import (
 
 	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
-	"go.iondynamics.net/siteMgr/msgType"
+	"go.iondynamics.net/siteMgr/protocol/msgType"
+	"go.iondynamics.net/siteMgr/srv"
 	"go.iondynamics.net/siteMgr/srv/registry"
 	"go.iondynamics.net/siteMgr/srv/session"
 )
@@ -29,7 +30,7 @@ func Init(e *echo.Echo) {
 		if c.Form("login-pass") != c.Form("login-pass2") {
 			return fmt.Errorf("%s", "passwords don't match")
 		}
-		usr := siteMgr.NewUser()
+		usr := srv.NewUser()
 		usr.Name = c.Form("login-name")
 		usr.Password = c.Form("login-pass")
 
@@ -46,7 +47,7 @@ func Init(e *echo.Echo) {
 	})
 
 	e.Post("/login", func(c *echo.Context) error {
-		usr := siteMgr.NewUser()
+		usr := srv.NewUser()
 		usr.Name = c.Form("login-name")
 		usr.Password = c.Form("login-pass")
 
@@ -314,16 +315,16 @@ func Init(e *echo.Echo) {
 	})
 }
 
-func getUser(c *echo.Context) *siteMgr.User {
+func getUser(c *echo.Context) *srv.User {
 	usr := c.Get("usr")
 	if usr == nil {
 		return nil
 	}
 	switch usr.(type) {
-	case *siteMgr.User:
-		return usr.(*siteMgr.User)
+	case *srv.User:
+		return usr.(*srv.User)
 	default:
-		idl.Err("context.Get(\"usr\") is not a *siteMgr.User")
+		idl.Err("context.Get(\"usr\") is not a *srv.User")
 	}
 	return nil
 }

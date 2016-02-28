@@ -1,40 +1,40 @@
 {{template "header" .}}
-{{$cinf := .Name | clientInfo}}
-{{with .Name}}
-		<div class="row">
-			<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
-				<p>
-					Currently logged in as <b>{{.}}</b><br>
-					Your Masterpassword generated this image:<br>
-					If it looks different than usual you misspelled it maybe
-				</p>
-			</div>
-			<div class="col-xs-12 col-sm-2">
-				{{$cinf.Identicon}}
-			</div>
-			<div class="col-xs-12 col-sm-4">
-				<p class="small text-muted">
-					<b>Client Info</b><br>
-					Message Version: {{$cinf.MsgVersion}}<br>
-					<table class="clientInfo">
-						<tr>
-							<td>Vendor:&nbsp;</td><td>{{$cinf.Vendor}}</td>
-						</tr>
-						<tr>
-							<td>Client:&nbsp;</td><td>{{$cinf.Client}}</td>
-						</tr>
-						<tr>
-							<td>Variant:&nbsp;</td><td>{{$cinf.Variant}}</td>
-						</tr>
-						<tr>
-							<td>Address:&nbsp;</td><td>{{$cinf.Address}}</td>
-						</tr>
-					</table>
-				</p>
-			</div>
-		</div>				
-{{end}}
-
+{{$cinf := .Name | connectionInfo}}
+<div class="row">
+	<div class="col-xs-12 col-sm-6" style="text-align: right;"><br>
+		<p>
+			Currently logged in as <b>{{.Name}}</b><br>
+			Your Masterpassword generated this image:<br>
+			If it looks different than usual you misspelled it maybe
+		</p>
+	</div>
+	<div class="col-xs-12 col-sm-2">
+		{{$cinf | identicon}}
+	</div>
+	<div class="col-xs-12 col-sm-4">
+		<p class="small text-muted">
+			<b>Client Info</b><br>
+			Protocol Version: {{$cinf.ProtocolVersion}}<br>
+			<table class="clientInfo">
+				<tr>
+					<td>Vendor:&nbsp;</td><td>{{$cinf.ClientVendor}}</td>
+				</tr>
+				<tr>
+					<td>Client:&nbsp;</td><td>{{$cinf.ClientName}}</td>
+				</tr>
+				<tr>
+					<td>Variant:&nbsp;</td><td>{{$cinf.ClientVariant}}</td>
+				</tr>
+				<tr>
+					<td>Version:&nbsp;</td><td>{{$cinf.ClientVersion}}</td>
+				</tr>
+				<tr>
+					<td>Address:&nbsp;</td><td>{{$cinf.RemoteAddress}}</td>
+				</tr>
+			</table>
+		</p>
+	</div>
+</div>		
 
 
 <div class="row">
@@ -97,7 +97,6 @@
 		</table>
 	</div>
 </div>
-{{if atLeast "0.6.0" $cinf.MsgVersion}}
 <div class="row">
 	<div class="col-xs-12">
 
@@ -144,7 +143,6 @@
 		</table>
 	</div>
 </div>
-{{end}}
 
 <div class="row">
 	<div class="col-xs-12 col-sm-6 col-sm-offset-3 col-md-offset-0">
@@ -181,33 +179,31 @@
 			</form>
 		</div>
 	</div>
-	{{if atLeast "0.6.0" $cinf.MsgVersion}}
-		<div class="col-xs-12 col-sm-6 col-sm-offset-3 col-md-offset-0">
-			<div class="well">
-				<h3>New Credentials:</h3>
-				<form action="/credentials/set" method="post" autocomplete="off">
-					<div class="form-group">
-						<input type="text" class="form-control" name="credentials-name" placeholder="Site URL" required>
-					</div>		
-					<div class="form-group">
-						<input type="text" class="form-control" name="credentials-login" placeholder="Login">
-					</div>
-					<div class="form-group">
-						<input type="text" class="form-control" name="credentials-email" placeholder="E-Mail" autocomplete="off">
-					</div>
-					<div class="form-group">
-						<input type="password" class="form-control" name="credentials-pass" placeholder="Password" autocomplete="off">
-					</div>
-					<div class="form-group">
-						<input type="password" class="form-control" name="credentials-pass-repeat" placeholder="Repeat Password" autocomplete="off">
-					</div>
-					<div class="form-group">
-						<button class="btn btn-primary" type="submit">Add Credentials</button>
-					</div>
-				</form>
-			</div>
+	<div class="col-xs-12 col-sm-6 col-sm-offset-3 col-md-offset-0">
+		<div class="well">
+			<h3>New Credentials:</h3>
+			<form action="/credentials/set" method="post" autocomplete="off">
+				<div class="form-group">
+					<input type="text" class="form-control" name="credentials-name" placeholder="Site URL" required>
+				</div>		
+				<div class="form-group">
+					<input type="text" class="form-control" name="credentials-login" placeholder="Login">
+				</div>
+				<div class="form-group">
+					<input type="text" class="form-control" name="credentials-email" placeholder="E-Mail" autocomplete="off">
+				</div>
+				<div class="form-group">
+					<input type="password" class="form-control" name="credentials-pass" placeholder="Password" autocomplete="off">
+				</div>
+				<div class="form-group">
+					<input type="password" class="form-control" name="credentials-pass-repeat" placeholder="Repeat Password" autocomplete="off">
+				</div>
+				<div class="form-group">
+					<button class="btn btn-primary" type="submit">Add Credentials</button>
+				</div>
+			</form>
 		</div>
-	{{end}}
+	</div>
 </div>
 
 {{template "footer" .}}

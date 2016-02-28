@@ -20,7 +20,8 @@ import (
 
 	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
-	"go.iondynamics.net/siteMgr/msgType"
+	"go.iondynamics.net/siteMgr/protocol"
+	"go.iondynamics.net/siteMgr/protocol/msgType"
 )
 
 var (
@@ -28,14 +29,16 @@ var (
 	loginEnv = "ID_SITEMGR_USER"
 	passEnv  = "ID_SITEMGR_PASS"
 
-	noEnv      = flag.Bool("no-env", false, "Set this to true if no environment variables should be used")
-	noTerminal = flag.Bool("no-terminal", false, "Set this to true if your standard input isn't a terminal")
-	debug      = flag.Bool("debug", false, "Enable debug logging")
-	server     = flag.String("server", "mgr.slpw.de:9210", "siteMgr-server host:port")
-	autoupdate = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
-	insecure   = flag.Bool("insecure", false, "Allow insecure connections")
+	noEnv       = flag.Bool("no-env", false, "Set this to true if no environment variables should be used")
+	noTerminal  = flag.Bool("no-terminal", false, "Set this to true if your standard input isn't a terminal")
+	debug       = flag.Bool("debug", false, "Enable debug logging")
+	server      = flag.String("server", "mgr.slpw.de:9210", "siteMgr-server host:port")
+	autoupdate  = flag.Bool("autoupdate", true, "Enable or disable automatic updates")
+	insecure    = flag.Bool("insecure", false, "Allow insecure connections")
+	noTelemetry = flag.Bool("noTelemetry", false, "Disable sending metrics to server")
 
-	VERSION = "0.6.0"
+	VERSION            = "0.7.0"
+	protocolConstraint = ">= 0.7.0"
 
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
@@ -50,11 +53,17 @@ var (
 func main() {
 	flag.Parse()
 	*idl.StandardLogger() = *idl.WithDebug(*debug)
+	if !*debug {
+		defer func() {
+			if r := recover(); r != nil {
+				idl.Emerg(r)
+			}
+		}()
+	}
 
 	VERSION = strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(VERSION), "'"), "'")
 
 	idl.Debug(VERSION)
-	encoder.Init(VERSION)
 
 	if *autoupdate == false {
 		updater = nil
@@ -125,22 +134,14 @@ func main() {
 		usr := siteMgr.NewUser()
 		enc := json.NewEncoder(conn)
 		dec := json.NewDecoder(conn)
-		msg := &siteMgr.Message{}
+		msg := &protocol.Message{}
 
 		for msg.Type != msgType.LOGIN_SUCCESS {
 			usr.Name = getLoginName(s)
 			usr.Password = getLoginPassword(s)
 
-			hash := sha512.New()
-			for i := 0; i < 10000; i++ {
-				hash.Write([]byte(fullname))
-				hash.Write(bytMasterPw)
-				hash.Write([]byte(usr.Name))
-				hash.Write([]byte(usr.Password))
-				hash.Write(hash.Sum(nil))
-			}
-			usr.Sites["identicon-hash"] = siteMgr.Site{Name: string(hash.Sum(nil))}
-			usr.Sites["client"] = siteMgr.Site{Name: "ionDynamics", Login: "siteMgr", Version: "CLI"}
+			//usr.SetSite("identicon-hash") = siteMgr.Site{Name: string(hash.Sum(nil))}
+			//usr.Sites["client"] = siteMgr.Site{Name: "ionDynamics", Login: "siteMgr", Version: "CLI"}
 
 			usrmsg, err := encoder.Do(usr)
 			if err != nil {
@@ -166,15 +167,49 @@ func main() {
 
 		say("Successfully logged in")
 
+		sites <- &siteMgr.Site{
+			Name:     usr.Name,
+			Template: statelessPassword.Printable16Templates[0],
+		}
+		pw := <-pwd
+
+		hash := sha512.New()
+		for i := 0; i < 10000; i++ {
+			hash.Write([]byte(pw))
+			hash.Write(hash.Sum(nil))
+		}
+
+		ci := &siteMgr.ConnectionInfo{
+			ProtocolVersion:    protocol.Version,
+			ProtocolConstraint: protocolConstraint,
+			ClientVendor:       "ionDynamics",
+			ClientName:         "siteMgr",
+			ClientVariant:      "CLI",
+			ClientVersion:      VERSION,
+			IdenticonHash:      hash.Sum(nil),
+		}
+
+		cimsg, err := encoder.Do(ci)
+		if err == nil {
+			err = enc.Encode(cimsg)
+			if err != nil {
+				idl.Err(err)
+			}
+		} else {
+			idl.Err(err)
+		}
+
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		go func() {
 			for {
 				<-c
-				gomsg := &siteMgr.Message{}
-				gomsg.Version = VERSION
-				gomsg.Type = msgType.LOGOUT
-				idl.Debug(enc.Encode(gomsg))
+				gomsg, err := encoder.Do(msgType.LOGOUT)
+				if err == nil {
+					idl.Debug(enc.Encode(gomsg))
+				} else {
+					idl.Debug(err)
+				}
 				conn.Close()
 				os.Exit(0)
 			}
@@ -200,9 +235,11 @@ func main() {
 				sites <- site
 				returnPw(pwd)
 
-			case msgType.UPDATE_AVAIL:
+			case msgType.INCOMPATIBLE:
+				say("This client is incompatible with the conntected server")
 				if updater != nil {
 					updater.Update()
+					say("Restart required")
 				}
 
 			case msgType.NOTICE:
@@ -215,7 +252,7 @@ func main() {
 				sites <- &siteMgr.Site{
 					Name:     "Internal Crypto Key",
 					Version:  "version1",
-					Template: statelessPassword.Printable32Templates[0],
+					Template: statelessPassword.Printable32Templates[0] + statelessPassword.Printable32Templates[0],
 				}
 
 				cred := &siteMgr.Credentials{}
@@ -244,7 +281,7 @@ func main() {
 				sites <- &siteMgr.Site{
 					Name:     "Internal Crypto Key",
 					Version:  "version1",
-					Template: statelessPassword.Printable32Templates[0],
+					Template: statelessPassword.Printable32Templates[0] + statelessPassword.Printable32Templates[0],
 				}
 
 				cred := &siteMgr.Credentials{}
@@ -256,7 +293,6 @@ func main() {
 				}
 
 				clip(crypto.Decrypt(pw, cred.Password))
-
 			}
 
 		}

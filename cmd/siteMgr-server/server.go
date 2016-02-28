@@ -2,13 +2,11 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	html "html/template"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/GeertJohan/go.rice"
@@ -22,6 +20,7 @@ import (
 
 	"go.iondynamics.net/siteMgr"
 	"go.iondynamics.net/siteMgr/encoder"
+	"go.iondynamics.net/siteMgr/protocol"
 	"go.iondynamics.net/siteMgr/srv/route"
 	"go.iondynamics.net/siteMgr/srv/template"
 )
@@ -35,11 +34,6 @@ var (
 	pemKeyPath   = flag.String("pemKeyPath", "", "Path to pem-encoded key")
 	noHTTPS      = flag.Bool("noHTTPS", false, "Use given certificate for HTTPS")
 
-	mu  sync.RWMutex
-	cim map[string]clientInfo = make(map[string]clientInfo)
-
-	VERSION = "0.8.3"
-
 	updater = &selfupdate.Updater{
 		CurrentVersion: VERSION,
 		ApiURL:         "https://update.slpw.de/",
@@ -49,13 +43,22 @@ var (
 		CmdName:        "siteMgr-server", // app name
 	}
 
+	VERSION            = "0.9.0"
+	protocolConstraint = ">= 0.7.0"
+
 	cert tls.Certificate
-	lcs  string
 )
 
 func main() {
 	flag.Parse()
 	*idl.StandardLogger() = *idl.WithDebug(*debug)
+	if !*debug {
+		defer func() {
+			if r := recover(); r != nil {
+				idl.Emerg(r)
+			}
+		}()
+	}
 
 	VERSION = strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(VERSION), "'"), "'")
 	idl.Info("Version: ", VERSION)
@@ -72,7 +75,6 @@ func main() {
 		idl.Emerg(err)
 	}
 
-	encoder.Init(VERSION)
 	update()
 	setupPersistence()
 	setupHttp()
@@ -83,8 +85,6 @@ func update() {
 	if *autoupdate {
 		go func() {
 			for {
-				lcs = latestClientVersion()
-
 				reload, _ := updater.Update()
 				idl.Debug("reload ", reload)
 				if reload {
@@ -101,29 +101,6 @@ func update() {
 			}
 		}()
 	}
-}
-
-func latestClientVersion() string {
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-	}
-	resp, err := client.Get("https://update.slpw.de/siteMgr-server/windows-amd64.json")
-	if err != nil {
-		idl.Err("latestClientVersion", err)
-	}
-
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	m := make(map[string]string)
-	err = dec.Decode(&m)
-	if err != nil {
-		idl.Err("latestClientVersion", err)
-	}
-	vers, ok := m["Version"]
-	if !ok {
-		idl.Err("latestClientVersion", "no version")
-	}
-	return vers
 }
 
 func setupPersistence() {
@@ -144,8 +121,12 @@ func setupHttp() {
 		"serverVersion": func() string {
 			return VERSION
 		},
-		"clientInfo": getClientInfo,
-		"atLeast":    siteMgr.AtLeast,
+		"protocolVersion": func() string {
+			return protocol.Version
+		},
+		"connectionInfo": connectionInfo,
+		"atLeast":        siteMgr.AtLeast,
+		"identicon":      identicon,
 	}))
 
 	if *debug {
