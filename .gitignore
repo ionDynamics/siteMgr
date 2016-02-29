@@ -22,6 +22,3 @@ _testmain.go
 *.exe
 *.test
 *.prof
-.goxc.json
-build.sh
-cmd/siteMgr-server/siteMgr.db
