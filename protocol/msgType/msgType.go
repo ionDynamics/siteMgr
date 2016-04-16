@@ -22,6 +22,7 @@ func (c Code) String() string {
 	switch c {
 	case HEARTBEAT:
 		return "HEARTBEAT"
+
 	case SITEMGR_SITE:
 		return "SITEMGR_SITE"
 

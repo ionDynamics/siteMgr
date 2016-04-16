@@ -33,6 +33,10 @@ func (u *User) SetSite(s Site) {
 	u.m.Lock()
 	defer u.m.Unlock()
 
+	if u.sites == nil {
+		u.sites = make(map[string]Site)
+	}
+
 	u.sites[s.Name] = s
 }
 
@@ -67,6 +71,10 @@ func (u *User) DelSite(s string) {
 func (u *User) SetCredentials(c Credentials) {
 	u.m.Lock()
 	defer u.m.Unlock()
+
+	if u.credentials == nil {
+		u.credentials = make(map[string]Credentials)
+	}
 
 	u.credentials[c.Name] = c
 }
